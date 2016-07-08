@@ -325,31 +325,6 @@ class JiraBot
       [ __, topic] = msg.match
       @send msg, Help.forTopic topic, @robot
 
-    #Enable/Disable Watch Notifications
-    @robot.respond Config.watch.notificationsRegex, (msg) =>
-      msg.finish()
-      [ __, state ] = msg.match
-      switch state
-        when "allow", "start", "enable"
-          @adapter.enableNotificationsFor msg.message.user
-          @send msg, """
-          JIRA Watch notifications have been *enabled*
-
-          You will start receiving notifications for JIRA tickets you are watching
-
-          If you wish to _disable_ them just send me this message:
-          > jira disable notifications
-          """
-        when "disallow", "stop", "disable"
-          @adapter.disableNotificationsFor msg.message.user
-          @send msg, """
-          JIRA Watch notifications have been *disabled*
-
-          You will no longer receive notifications for JIRA tickets you are watching
-
-          If you wish to _enable_ them again just send me this message:
-          > jira enable notifications
-          """
     #Search
     @robot.respond Config.search.regex, (msg) =>
       msg.finish()
