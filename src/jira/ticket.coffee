@@ -22,12 +22,6 @@ class Ticket
     fields = []
     fieldsFallback = ""
     if includeFields
-      if @watchers?.length > 0
-        watchers = []
-        fallbackWatchers = []
-        for watcher in @watchers
-          watchers.push Utils.lookupUserWithJira watcher
-          fallbackWatchers.push Utils.lookupUserWithJira watcher, yes
       fields = [
         title: "Status"
         value: @fields.status.name
@@ -36,20 +30,10 @@ class Ticket
         title: "Assignee"
         value: Utils.lookupUserWithJira @fields.assignee
         short: yes
-      ,
-        title: "Reporter"
-        value: Utils.lookupUserWithJira @fields.reporter
-        short: yes
-      ,
-        title: "Watchers"
-        value: if watchers then watchers.join ', ' else "None"
-        short: yes
       ]
       fieldsFallback = """
         Status: #{@fields.status.name}
         Assignee: #{Utils.lookupUserWithJira @fields.assignee, yes}
-        Reporter: #{Utils.lookupUserWithJira @fields.reporter, yes}
-        Watchers: #{if fallbackWatchers then fallbackWatchers.join ', ' else "None"}
       """
 
     color: result.color
