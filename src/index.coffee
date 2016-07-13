@@ -70,6 +70,9 @@ class JiraBot
     return message
 
   matchJiraTicket: (message) ->
+    if message.bot_id || message.user.is_bot
+      return false
+
     if message.match?
       matches = message.match(Config.ticket.regexGlobal)
     else if message.message?.rawText?.match?
@@ -88,6 +91,9 @@ class JiraBot
     return false
 
   prepareResponseForJiraTickets: (msg) ->
+    if msg.bot_id
+      return false
+
     Promise.all(msg.match.map (key) =>
       _attachments = []
       Jira.Create.fromKey(key).then (ticket) ->
