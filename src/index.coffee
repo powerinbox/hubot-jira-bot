@@ -69,8 +69,20 @@ class JiraBot
     message.attachments = _(message.attachments).difference removals
     return message
 
+  isBotMessage: (message) ->
+    if message.subtype == 'bot_message' || message.bot_id
+      return true
+
+    if message.user && message.user.slack && message.user.slack.is_bot
+      return true
+
+    if message.rawMessage && message.rawMessage.subtype == 'bot_message'
+      return true
+
+    return false
+
   matchJiraTicket: (message) ->
-    if message.bot_id || message.user.is_bot
+    if @isBotMessage message
       return false
 
     if message.match?
@@ -95,9 +107,6 @@ class JiraBot
     return false
 
   prepareResponseForJiraTickets: (msg) ->
-    if msg.bot_id
-      return false
-
     Promise.all(msg.match.map (key) =>
       _attachments = []
       Jira.Create.fromKey(key).then (ticket) ->
@@ -436,6 +445,9 @@ class JiraBot
 
     #Mention ticket by url
     @robot.hear Config.jira.urlRegexGlobal, (msg) =>
+      if @isBotMessage msg.message
+        return false
+
       [ __, ticket ] = msg.match
       matches = msg.match.map (match) ->
         match.match(Config.jira.urlRegex)[1]
@@ -443,6 +455,6 @@ class JiraBot
       @prepareResponseForJiraTickets msg
 
     #Mention ticket by key
-    @robot.listen @matchJiraTicket, @prepareResponseForJiraTickets.bind @
+    @robot.listen @matchJiraTicket.bind(@), @prepareResponseForJiraTickets.bind @
 
 module.exports = JiraBot
