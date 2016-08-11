@@ -74,9 +74,13 @@ class JiraBot
       return false
 
     if message.match?
-      matches = message.match(Config.ticket.regexGlobal)
+      matches = message.match Config.ticket.regexGlobal
+      unless matches and matches[0]
+        urlMatch = message.match Config.jira.urlRegex
+        if urlMatch and urlMatch[1]
+          matches = [ urlMatch[1] ]
     else if message.message?.rawText?.match?
-      matches = message.message.rawText.match(Config.ticket.regexGlobal)
+      matches = message.message.rawText.match Config.ticket.regexGlobal
 
     if matches and matches[0]
       return matches
@@ -85,7 +89,7 @@ class JiraBot
         attachments = message.message.rawMessage.attachments
         for attachment in attachments
           if attachment.text?
-            matches = attachment.text.match(Config.ticket.regexGlobal)
+            matches = attachment.text.match Config.ticket.regexGlobal
             if matches and matches[0]
               return matches
     return false
@@ -425,7 +429,10 @@ class JiraBot
           channels.push " <\##{channel.id}|#{channel.name}>" if channel
         return msg.reply "#{type} must be submitted in one of the following project channels: #{channels}"
 
-      Jira.Create.with project, type, summary, msg
+      if Config.duplicates.detection and @adapter.detectForDuplicates?
+        @adapter.detectForDuplicates project, type, summary, msg
+      else
+        Jira.Create.with project, type, summary, msg
 
     #Mention ticket by url
     @robot.hear Config.jira.urlRegexGlobal, (msg) =>
