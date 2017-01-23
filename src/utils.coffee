@@ -4,6 +4,10 @@ fetch = require "node-fetch"
 cache = require "memory-cache"
 
 Config = require "./config"
+StatsD = require('node-dogstatsd').StatsD
+
+if Config.stats.host and Config.stats.port and Config.stats.prefix
+  c = new StatsD Config.stats.host, Config.stats.port
 
 class Utils
   @robot: null
@@ -44,15 +48,17 @@ class Utils
     _(results).keys()
 
   @lookupChatUser: (username) ->
-    users = Utils.robot.brain.users()
+    users = Utils.JiraBot.adapter.getUsers()
+    return users[username] if users[username] #Note: if get the user id instead of username
+
     result = (users[user] for user of users when users[user].name is username)
     if result?.length is 1
       return result[0]
     return null
 
   @lookupUserWithJira: (jira, fallback=no) ->
-    users = Utils.robot.brain.users()
-    result = (users[user] for user of users when users[user].email_address is jira.emailAddress) if jira
+    users = Utils.JiraBot.adapter.getUsers()
+    result = (users[user] for user of users when users[user].profile.email is jira.emailAddress) if jira
     if jira
       return jira.displayName
     else if result?.length is 1
@@ -69,8 +75,8 @@ class Utils
     return chatUsers
 
   @lookupChatUserWithJira: (jira) ->
-    users = Utils.robot.brain.users()
-    result = (users[user] for user of users when users[user].email_address is jira.emailAddress) if jira
+    users = Utils.JiraBot.adapter.getUsers()
+    result = (users[user] for user of users when users[user].profile.email is jira.emailAddress) if jira
     return result[0] if result?.length is 1
     return null
 
@@ -89,7 +95,7 @@ class Utils
     findMatch = (user) ->
       name = user.name or user.login
       return unless name
-      users = Utils.robot.brain.users()
+      users = Utils.JiraBot.adapter.getUsers()
       users = _(users).keys().map (id) ->
         u = users[id]
         id: u.id
@@ -119,9 +125,35 @@ class Utils
     results = f.search term
     result = if results? and results.length >=1 then results[0]
 
+  @isBotMessage: (message) ->
+    if message.subtype == 'bot_message' || message.bot_id
+      return true
+
+    if message.user && message.user.slack && message.user.slack.is_bot
+      return true
+
+    if message.rawMessage && message.rawMessage.subtype == 'bot_message'
+      return true
+
+    return false
+
   @cache:
     put: (key, value, time=Config.cache.default.expiry) -> cache.put key, value, time
     get: cache.get
+
+  @Stats:
+    increment: (label, tags) ->
+      try
+        label = label
+          .replace( /[\/\(\)-]/g, '.' ) #Convert slashes, brackets and dashes to dots
+          .replace( /[:\?]/g, '' ) #Remove any colon or question mark
+          .replace( /\.+/g, '.' ) #Compress multiple periods into one
+          .replace( /\.$/, '' ) #Remove any trailing period
+
+        console.log "#{Config.stats.prefix}.#{label}", tags if Config.debug
+        c.increment "#{Config.stats.prefix}.#{label}", tags if c
+      catch e
+        console.error e
 
   @extract:
     all: (summary) ->
@@ -156,6 +188,9 @@ class Utils
       if Config.labels.regex.test summary
         labels = (summary.match(Config.labels.regex).map((label) -> label.replace('#', '').trim())).concat(labels)
         summary = summary.replace Config.labels.regex, ""
+      if Config.labels.slackChannelRegexGlobal.test summary
+        labels = (summary.match(Config.labels.slackChannelRegexGlobal).map((label) -> label.replace(Config.labels.slackChannelRegex, "$1"))).concat(labels)
+        summary = summary.replace Config.labels.slackChannelRegexGlobal, ""
       return [summary, labels]
 
     priority: (summary) ->
