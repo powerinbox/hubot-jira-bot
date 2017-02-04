@@ -129,7 +129,7 @@ class Utils
     if message.subtype == 'bot_message' || message.bot_id
       return true
 
-    if message.user && message.user.is_bot
+    if message.user && (message.user.is_bot || message.user.app_id)
       return true
 
     if message.rawMessage && message.rawMessage.subtype == 'bot_message'
