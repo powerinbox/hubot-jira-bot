@@ -18,7 +18,9 @@ class Create
     assignee = null
     room = Utils.JiraBot.adapter.getRoomName context
 
-    if context.message.user.profile?.email?
+    if context.message.user.email_address?
+      user = User.withEmail(context.message.user.email_address)
+    else if context.message.user.profile?.email?
       user = User.withEmail(context.message.user.profile.email)
     else
       user = Promise.resolve()
